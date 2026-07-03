@@ -23,6 +23,13 @@ def test_native_root_strips_v1_suffix():
     assert native_root("http://h:11434") == "http://h:11434"
 
 
+def test_native_root_strips_surrounding_whitespace():
+    # base_url sourced from a config file / env var often carries a trailing newline;
+    # without stripping, the /v1 suffix check fails and the probe URL is malformed.
+    assert native_root("http://h:11434/v1\n") == "http://h:11434"
+    assert native_root("  http://h:11434/v1  ") == "http://h:11434"
+
+
 def test_detection_off_when_flag_unset(monkeypatch):
     monkeypatch.delenv("HERMES_OLLAMA_NATIVE", raising=False)
     # No network should be touched when the flag is off.

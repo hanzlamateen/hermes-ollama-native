@@ -82,6 +82,23 @@ def test_assistant_tool_call_arguments_string_to_object():
     assert tool_msg["tool_name"] == "lookup"
 
 
+def test_tool_call_arguments_non_object_json_coerced_to_empty():
+    # A JSON string that decodes to a non-object (null / array / scalar) must become
+    # {} — Ollama expects tool-call arguments as an object, not None/list/int.
+    for bad in ("null", "[1, 2]", "5", '"a string"'):
+        req = build_ollama_request(
+            model="m",
+            messages=[
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [{"function": {"name": "f", "arguments": bad}}],
+                }
+            ],
+        )
+        assert req["messages"][0]["tool_calls"][0]["function"]["arguments"] == {}, bad
+
+
 def test_multimodal_image_data_url_extracted():
     req = build_ollama_request(
         model="m",

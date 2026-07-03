@@ -6,6 +6,37 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `native_root` now strips surrounding whitespace, so a `base_url` with a trailing
+  newline (common from config files / env vars) no longer silently disables native
+  routing.
+- The native client keeps its long read timeout (600s) even when an external
+  `http_client` is injected — a request with no explicit timeout no longer falls back
+  to httpx's 5s default.
+- Expose the httpx client as `_client` (alias of `_http`) so a host's socket-abort /
+  interrupt path (which follows the OpenAI-SDK `_client` convention) can reach the
+  connection pool.
+- Tool-call `arguments` that JSON-decode to a non-object (`null` / array / scalar) are
+  coerced to `{}` — Ollama expects an object.
+- The optional startup `.pth` is now self-healing (a leftover `.pth` after
+  `pip uninstall` no-ops instead of printing a `site` traceback on every start),
+  installs into the site-packages dir that actually holds the package (correct for
+  `--user`/system installs), and `_autoload` checks the flag before importing httpx.
+  `uninstall-pth` is race-safe and `status` now reports `HERMES_OLLAMA_NATIVE_AUX`.
+- Shim hardening: Hook 1 now injects the agent's keepalive `http_client` (faster
+  dead-peer detection); the meta-path finder serializes its self-removal (thread-safe
+  concurrent target imports) and degrades cleanly if a loader forbids wrapping; Hook 2
+  tolerates an unexpected resolver return arity without raising.
+
+### Added
+
+- Hook 3: resolve a named custom instance (`custom:<name>`) to the `custom` provider
+  profile so per-request `num_ctx` is injected for it. Without this, a `custom:<name>`
+  Ollama endpoint routed to the native client would still load at Ollama's 4096 default
+  (the registry lookup is an exact match, so the legacy request-build path dropped
+  `num_ctx`). Gated on `HERMES_OLLAMA_NATIVE`.
+
 ### Tests
 
 - Confirm multi-instance support: the shim selects the native client from the

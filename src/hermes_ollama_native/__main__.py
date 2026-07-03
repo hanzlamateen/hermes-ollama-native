@@ -28,6 +28,15 @@ def _flag_state() -> str:
     return f"{'on' if on else 'off'} (HERMES_OLLAMA_NATIVE={raw!r})"
 
 
+def _aux_state() -> str:
+    # Hook 2 (aux side-tasks) defaults ON when native mode is on; only "0"/false disables.
+    raw = os.environ.get("HERMES_OLLAMA_NATIVE_AUX")
+    if raw is None:
+        return "on (default; HERMES_OLLAMA_NATIVE_AUX unset)"
+    on = raw.strip().lower() in _TRUTHY
+    return f"{'on' if on else 'off'} (HERMES_OLLAMA_NATIVE_AUX={raw!r})"
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hermes-ollama-native",
@@ -77,6 +86,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.cmd == "status":
         print(f"version:      {__version__}")
         print(f"flag:         {_flag_state()}")
+        print(f"aux flag:     {_aux_state()}")
         print(f"startup .pth: {'installed' if is_installed() else 'not installed'} ({pth_path()})")
         print(
             "note: native routing also requires the target base_url to be a live "
