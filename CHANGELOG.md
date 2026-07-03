@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Tests
+
+- Confirm multi-instance support: the shim selects the native client from the
+  endpoint probe alone (it never inspects `agent.provider`), so several Ollama
+  providers named `custom:<instance>` all use the native path. This makes the
+  package immune to the upstream `custom:<instance>` selection bug fixed in
+  NousResearch/hermes-agent#55606.
+
 ## [0.1.0] - 2026-06-30
 
 ### Added

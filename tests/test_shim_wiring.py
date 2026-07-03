@@ -45,6 +45,30 @@ def test_hook1_routes_native_to_adapter_and_passes_through_otherwise(monkeypatch
     assert seen["orig"] == ("primary", False)
 
 
+def test_hook1_routes_regardless_of_provider_name(monkeypatch):
+    """The shim routes on the base_url probe alone and never inspects agent.provider,
+    so it is immune to the upstream 'custom:<instance>' selection bug: a named
+    instance like 'custom:ollama-2' still gets the native client."""
+    monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: True)
+
+    def orig_create(agent, client_kwargs, *, reason, shared):
+        return "ORIG"
+
+    fake_module = types.SimpleNamespace(create_openai_client=orig_create)
+    shim._patch_runtime(fake_module)
+
+    for provider in ("custom", "custom:ollama-2", "custom:Ollama"):
+        agent = types.SimpleNamespace(provider=provider)
+        client = fake_module.create_openai_client(
+            agent,
+            {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
+            reason="primary",
+            shared=False,
+        )
+        assert isinstance(client, adapter.OllamaNativeClient), provider
+
+
 def test_hook1_is_idempotent(monkeypatch):
     monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
 
