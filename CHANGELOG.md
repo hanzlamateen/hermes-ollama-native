@@ -6,6 +6,24 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Thinking-capability gate: `think` is only sent when the model advertises the
+  `thinking` capability (probed via `/api/show` with the client's auth headers;
+  definitive answers memoized per endpoint + model, failures TTL-cached). Newer
+  Ollama 400s on a truthy `think` for models without the capability
+  (`think: false` is tolerated); the gate drops `think` entirely for non-thinking
+  models as the safe superset, mirroring Ollama's own relax path. Older
+  (pre-capability) servers accept a forwarded `think` for any model; on a failed
+  probe the gate fails open and forwards `think` unchanged. Zero overhead when
+  `think` isn't requested. Suggested by @laurinaitis on
+  NousResearch/hermes-agent#55606.
+
+### Fixed
+
+- Error messages now surface Ollama's `{"error": "<str>"}` body text directly
+  instead of the raw JSON blob (raw body retained as fallback for non-JSON errors).
+
 ## [0.2.0] - 2026-07-03
 
 ### Added

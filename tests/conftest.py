@@ -9,11 +9,13 @@ from hermes_ollama_native import adapter
 
 @pytest.fixture(autouse=True)
 def _clear_probe_cache():
-    """The Ollama detection probe memoizes positives for the process lifetime;
-    clear it around every test so cases don't leak cached results into each other."""
+    """The Ollama detection + capability probes memoize for the process lifetime;
+    clear them around every test so cases don't leak cached results into each other."""
     adapter._OLLAMA_PROBE_CACHE.clear()
+    adapter._THINKING_CAP_CACHE.clear()
     yield
     adapter._OLLAMA_PROBE_CACHE.clear()
+    adapter._THINKING_CAP_CACHE.clear()
 
 
 @pytest.fixture
