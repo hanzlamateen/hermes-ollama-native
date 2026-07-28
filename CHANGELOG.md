@@ -6,6 +6,45 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The `/api/version` probe now sends the endpoint's auth material (api_key /
+  default headers / query params) and honors the resolved TLS `verify` — behind an
+  authenticated reverse proxy or a private CA the unauthenticated probe would 401 /
+  SSLError and native routing silently never engaged for exactly those deployments.
+  A 401/403 probe response now logs at warning instead of staying silent.
+- Streaming transport errors (ReadTimeout, ConnectError, RemoteProtocolError, …)
+  propagate with their concrete httpx types instead of being wrapped in
+  `OllamaAPIError` — Hermes's mid-stream reconnect classifies on isinstance checks
+  against those exact types, so the wrap silently disabled reconnects and could
+  misroute a dropped peer into history compression.
+- In-band `{"error": "<str>"}` NDJSON frames on an already-200 stream (runner OOM,
+  model crash) now raise with the server's actual message instead of being silently
+  dropped as a clean-looking end of stream.
+- `/api/version` probe caching reworked: definitive outcomes (positive, or
+  provably-not-Ollama — 404 / wrong-shape 200) are cached with a bounded 1h TTL,
+  so a server swap on the same port re-detects within the hour (instead of
+  hard-404ing every turn until restart) and a non-Ollama endpoint costs at most
+  one probe per hour on the client-build path (was one per minute). Indeterminate
+  failures (transport blip, 401/403, 5xx) keep the previous 60s retry TTL, so a
+  restarting Ollama or a fixed credential still recovers within a minute.
+- Non-base64 `image_url` parts (remote http(s) URLs) degrade to a visible
+  `[Image: <url>]` text marker plus a warning log instead of vanishing silently —
+  native `/api/chat` only accepts base64 images, and a silent drop had the model
+  confidently describing an image it never received.
+- `default_query` (URL-token auth, api-version params extracted from a
+  query-bearing base_url) is accepted by the client and forwarded on every native
+  request, matching the stock OpenAI client's behavior.
+- Hook 3 (`custom:<name>` → `custom` profile resolution) is now gated on the named
+  instance's endpoint actually identifying as Ollama (resolved best-effort from
+  config — both the legacy `custom_providers` list and the keyed `providers`
+  schema, using the entry's api_key/key_env/extra_headers for the probe): the
+  profile injects a default `max_tokens` and reasoning fields that gateways with
+  lower completion caps or strict request validation can reject. The gate fails
+  closed only on a definitive "not Ollama" probe answer; unresolvable instances
+  and indeterminate probe failures keep the previous behavior (fail-open toward
+  Ollama, matching this package's opt-in intent).
+
 ## [0.3.0] - 2026-07-13
 
 ### Added

@@ -11,7 +11,7 @@ from hermes_ollama_native import adapter, shim
 
 def test_hook1_routes_native_to_adapter_and_passes_through_otherwise(monkeypatch):
     monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: True)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: True)
 
     seen = {}
 
@@ -34,7 +34,7 @@ def test_hook1_routes_native_to_adapter_and_passes_through_otherwise(monkeypatch
     assert "orig" not in seen
 
     # A non-Ollama endpoint (probe says no) → falls through to the original verbatim.
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: False)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: False)
     result = fake_module.create_openai_client(
         object(),
         {"base_url": "https://api.openai.com/v1"},
@@ -50,7 +50,7 @@ def test_hook1_routes_regardless_of_provider_name(monkeypatch):
     so it is immune to the upstream 'custom:<instance>' selection bug: a named
     instance like 'custom:ollama-2' still gets the native client."""
     monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: True)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: True)
 
     def orig_create(agent, client_kwargs, *, reason, shared):
         return "ORIG"
@@ -84,7 +84,7 @@ def test_hook1_is_idempotent(monkeypatch):
 
 def test_hook2_native_swap(monkeypatch):
     monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: True)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: True)
 
     native = shim._native_swap(
         types.SimpleNamespace(
@@ -95,7 +95,7 @@ def test_hook2_native_swap(monkeypatch):
     assert native.base_url == "http://localhost:11434"
 
     # Non-Ollama client (probe negative) is left alone.
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: False)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: False)
     assert shim._native_swap(types.SimpleNamespace(base_url="https://api.openai.com/v1")) is None
     assert shim._native_swap(None) is None
 
@@ -104,7 +104,7 @@ def test_hook1_injects_keepalive_http_client(monkeypatch):
     import httpx
 
     monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
-    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, timeout=2.0: True)
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: True)
 
     keepalive = httpx.Client()
     fake_agent = types.SimpleNamespace(

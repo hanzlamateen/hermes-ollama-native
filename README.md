@@ -57,6 +57,7 @@ hermes            # run Hermes as usual
 
 ```python
 import hermes_ollama_native
+
 hermes_ollama_native.activate()
 ```
 
