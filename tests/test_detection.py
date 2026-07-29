@@ -255,3 +255,55 @@ def test_version_probe_passes_verify(native_flag, monkeypatch):
         assert is_native_ollama_base_url("http://h:11434/v1", verify="/etc/ssl/corp-ca.pem") is True
     assert get.call_args.kwargs["verify"] == "/etc/ssl/corp-ca.pem"
     adapter._OLLAMA_PROBE_CACHE.clear()
+
+
+@respx.mock
+def test_probe_default_headers_override_api_key_authorization(native_flag):
+    # _headers() lets default_headers override the api_key-derived Authorization,
+    # so the probe must too — a placeholder api_key with real gateway auth in
+    # extra_headers must probe with the credentials real requests will send.
+    from hermes_ollama_native.adapter import _OLLAMA_PROBE_CACHE
+
+    _OLLAMA_PROBE_CACHE.clear()
+    probe = respx.get("http://h:11434/api/version").mock(
+        return_value=httpx.Response(200, json={"version": "0.32.5"})
+    )
+    assert (
+        is_native_ollama_base_url(
+            "http://h:11434/v1",
+            api_key="not-needed",
+            default_headers={"Authorization": "Bearer real-gateway-token"},
+        )
+        is True
+    )
+    assert probe.calls.last.request.headers["Authorization"] == "Bearer real-gateway-token"
+    _OLLAMA_PROBE_CACHE.clear()
+
+
+def test_uppercase_data_scheme_still_decodes():
+    # RFC 2397 scheme names are case-insensitive: an uppercase DATA: URL must be
+    # decoded as an image (and a malformed uppercase one dropped), never routed
+    # to the remote-URL marker path where its base64 would leak into the prompt.
+    from hermes_ollama_native.adapter import _coerce_text
+
+    text, images = _coerce_text(
+        [
+            {"type": "image_url", "image_url": {"url": "DATA:image/png;base64,QUJD"}},
+            {"type": "image_url", "image_url": {"url": "Data:image/png;base64" + "A" * 500}},
+        ]
+    )
+    assert images == ["QUJD"]
+    assert "[Image:" not in text and "A" * 100 not in text
+
+
+def test_http_error_empty_error_string_keeps_raw_body():
+    # {"error": ""} must not resurrect the bare trailing colon — keep the raw
+    # body as the diagnostic.
+    from hermes_ollama_native.adapter import _http_error
+
+    resp = httpx.Response(
+        500, request=httpx.Request("POST", "http://h:11434/api/chat"), content=b'{"error": ""}'
+    )
+    msg = str(_http_error(resp))
+    assert not msg.rstrip().endswith(":")
+    assert '{"error": ""}' in msg

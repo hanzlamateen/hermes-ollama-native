@@ -142,6 +142,130 @@ def test_hook3_resolves_custom_instance_to_custom_profile(monkeypatch):
     assert fake.get_provider_profile("gemini") is None  # non-custom unaffected
 
 
+def test_hook1_resolves_verify_without_provider_ssl_keys(monkeypatch):
+    """verify is resolved unconditionally (the resolver reads env CA bundles that
+    never appear in client_kwargs) and forwarded to the probe."""
+    import sys
+
+    monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
+    captured = {}
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **kw: captured.update(kw) or True)
+    fake_ssl_verify = types.SimpleNamespace(
+        resolve_httpx_verify=lambda *, ca_bundle=None, ssl_verify=None, base_url="": "ENV_CA_CTX"
+    )
+    monkeypatch.setitem(sys.modules, "agent", types.SimpleNamespace(ssl_verify=fake_ssl_verify))
+    monkeypatch.setitem(sys.modules, "agent.ssl_verify", fake_ssl_verify)
+
+    fake_module = types.SimpleNamespace(
+        create_openai_client=lambda agent, client_kwargs, *, reason, shared: "ORIG"
+    )
+    shim._patch_runtime(fake_module)
+    client = fake_module.create_openai_client(
+        object(),
+        {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},  # no ssl keys
+        reason="primary",
+        shared=False,
+    )
+    assert isinstance(client, adapter.OllamaNativeClient)
+    assert captured.get("verify") == "ENV_CA_CTX"
+
+
+def test_hook1_keepalive_verify_by_signature_inspection(monkeypatch):
+    """A verify-accepting builder gets verify; a legacy builder is called plain;
+    a TypeError raised INSIDE a verify-accepting builder is not silently retried
+    without verify (which would hand out a client missing the custom CA)."""
+    import sys
+
+    import httpx
+
+    monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
+    monkeypatch.setattr(adapter, "_probe_is_ollama", lambda root, **_kw: True)
+    fake_ssl_verify = types.SimpleNamespace(
+        resolve_httpx_verify=lambda *, ca_bundle=None, ssl_verify=None, base_url="": "CA_CTX"
+    )
+    monkeypatch.setitem(sys.modules, "agent", types.SimpleNamespace(ssl_verify=fake_ssl_verify))
+    monkeypatch.setitem(sys.modules, "agent.ssl_verify", fake_ssl_verify)
+
+    fake_module = types.SimpleNamespace(
+        create_openai_client=lambda agent, client_kwargs, *, reason, shared: "ORIG"
+    )
+    shim._patch_runtime(fake_module)
+    kwargs = {"base_url": "http://localhost:11434/v1", "api_key": "ollama"}
+
+    # 1. builder accepts verify → receives the resolved value.
+    keepalive = httpx.Client()
+    calls = []
+
+    def modern_builder(base_url, *, verify=True):
+        calls.append(verify)
+        return keepalive
+
+    client = fake_module.create_openai_client(
+        types.SimpleNamespace(_build_keepalive_http_client=modern_builder),
+        dict(kwargs),
+        reason="primary",
+        shared=False,
+    )
+    assert client._http is keepalive and calls == ["CA_CTX"]
+
+    # 2. legacy builder (no verify param) → called plain, no TypeError.
+    client = fake_module.create_openai_client(
+        types.SimpleNamespace(_build_keepalive_http_client=lambda base_url: keepalive),
+        dict(kwargs),
+        reason="primary",
+        shared=False,
+    )
+    assert client._http is keepalive
+
+    # 3. TypeError inside a verify-accepting builder → no blind retry without
+    # verify; the keepalive is skipped and the client builds its own transport.
+    calls.clear()
+
+    def broken_builder(base_url, *, verify=True):
+        calls.append(verify)
+        raise TypeError("boom inside builder")
+
+    client = fake_module.create_openai_client(
+        types.SimpleNamespace(_build_keepalive_http_client=broken_builder),
+        dict(kwargs),
+        reason="primary",
+        shared=False,
+    )
+    assert isinstance(client, adapter.OllamaNativeClient)
+    assert calls == ["CA_CTX"]  # called once — never re-called without verify
+    assert client._http is not keepalive
+    keepalive.close()
+
+
+def test_hook3_gate_splits_query_bearing_base_url(monkeypatch):
+    """A config base_url carrying URL-token auth must probe a well-formed
+    /api/version URL with the token as query params — not a mangled URL that
+    404s into a definitive 'not Ollama' and drops num_ctx injection."""
+    import sys
+
+    monkeypatch.setenv("HERMES_OLLAMA_NATIVE", "1")
+    captured = {}
+    monkeypatch.setattr(
+        adapter, "_probe_is_ollama", lambda root, **kw: captured.update(kw, root=root) or True
+    )
+    fake_config = types.SimpleNamespace(
+        load_config_readonly=lambda: {
+            "custom_providers": [{"name": "myoll", "base_url": "http://h:11434/v1?token=abc"}]
+        }
+    )
+    fake_providers = types.SimpleNamespace(
+        custom_provider_slug=lambda n: "custom:" + n.strip().lower().replace(" ", "-")
+    )
+    fake_pkg = types.SimpleNamespace(config=fake_config, providers=fake_providers)
+    monkeypatch.setitem(sys.modules, "hermes_cli", fake_pkg)
+    monkeypatch.setitem(sys.modules, "hermes_cli.config", fake_config)
+    monkeypatch.setitem(sys.modules, "hermes_cli.providers", fake_providers)
+
+    assert shim._named_custom_is_ollama("custom:myoll") is True
+    assert captured["root"] == "http://h:11434"  # query split off, /v1 stripped
+    assert captured.get("params") == {"token": "abc"}  # token still reaches the probe
+
+
 def test_hook3_noop_when_flag_off(monkeypatch):
     monkeypatch.delenv("HERMES_OLLAMA_NATIVE", raising=False)
 

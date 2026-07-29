@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Hook 3 no longer mangles a query-bearing custom-provider base_url: the query
+  string (URL-token auth) is split off before probing, so the probe hits a
+  well-formed `/api/version` with the token as query params — instead of 404ing
+  into a definitive "not Ollama" that silently dropped num_ctx injection for a
+  genuine Ollama instance for up to an hour. The gate's probe also now carries
+  the entry's TLS trust (its ssl fields, or the env CA bundles).
+- Hook 1 resolves TLS `verify` unconditionally, matching stock
+  `create_openai_client`: the resolver also honors the `HERMES_CA_BUNDLE` /
+  `SSL_CERT_FILE` / `REQUESTS_CA_BUNDLE` / `CURL_CA_BUNDLE` env vars, which
+  never appear in client_kwargs — previously a private-CA endpoint trusted via
+  env var probe-failed as indeterminate and native routing never engaged.
+- The probe's `default_headers` now override the api_key-derived Authorization,
+  matching real-request `_headers()` precedence — a placeholder api_key with
+  real gateway auth in `extra_headers` now probes with the credentials requests
+  will actually send.
+- The keepalive builder's older-signature fallback uses signature inspection
+  instead of `except TypeError`, which could also swallow a TypeError raised
+  inside the builder and silently rebuild the client without the custom CA.
+- `data:` image URLs are matched case-insensitively (RFC 2397): an uppercase
+  `DATA:` base64 URL is decoded as an image instead of leaking a truncated
+  base64 marker into the prompt text.
+- An `{"error": ""}` error body no longer produces a bare-trailing-colon
+  message; the raw body is kept as the diagnostic.
+
 ## [0.3.1] - 2026-07-28
 
 ### Fixed
@@ -124,6 +152,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Explicit `activate()` API and a `hermes-ollama-native` CLI
   (`install-pth` / `uninstall-pth` / `status`) for persistent, opt-in startup activation.
 
+[Unreleased]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.3.1...HEAD
 [0.3.1]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.1.0...v0.2.0
