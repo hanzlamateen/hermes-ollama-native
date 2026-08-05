@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Top-level `reasoning_effort` — the format Hermes's custom profile emits for
+  configured reasoning levels — is translated to the native `think` value
+  instead of being silently discarded (which fell back to the server default
+  for `low`/`high`/`max`). An explicit `extra_body.think` wins, `"none"` maps
+  to `think=False` (preserving the profile's disabled pairing), and level
+  strings pass through unchanged, exactly as Ollama's own `/v1`
+  `reasoning_effort` mapping does — so `/v1` and native stay
+  behavior-identical per level. The thinking-capability gate still applies
+  after translation.
+
 ## [0.3.2] - 2026-07-29
 
 ### Fixed

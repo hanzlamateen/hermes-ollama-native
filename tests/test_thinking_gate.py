@@ -60,6 +60,46 @@ def test_think_string_level_passes_through():
 
 
 @respx.mock
+def test_reasoning_effort_translated_to_native_think():
+    # Hermes's custom profile emits a configured reasoning level as TOP-LEVEL
+    # reasoning_effort (the field /v1 honors), not extra_body.think — the native
+    # client must translate it or configured levels silently fall back to the
+    # server default.
+    chat = _mock_show_and_chat({"capabilities": ["completion", "thinking"]})
+    client = OllamaNativeClient(base_url="http://h:11434")
+    client.chat.completions.create(
+        model="gpt-oss", messages=[{"role": "user", "content": "x"}], reasoning_effort="high"
+    )
+    sent = json.loads(chat.calls.last.request.content)
+    assert sent["think"] == "high"
+
+
+@respx.mock
+def test_reasoning_effort_none_maps_to_think_false():
+    chat = _mock_show_and_chat({"capabilities": ["completion", "thinking"]})
+    client = OllamaNativeClient(base_url="http://h:11434")
+    client.chat.completions.create(
+        model="gpt-oss", messages=[{"role": "user", "content": "x"}], reasoning_effort="none"
+    )
+    sent = json.loads(chat.calls.last.request.content)
+    assert sent["think"] is False
+
+
+@respx.mock
+def test_explicit_think_wins_over_reasoning_effort():
+    chat = _mock_show_and_chat({"capabilities": ["completion", "thinking"]})
+    client = OllamaNativeClient(base_url="http://h:11434")
+    client.chat.completions.create(
+        model="gpt-oss",
+        messages=[{"role": "user", "content": "x"}],
+        reasoning_effort="high",
+        extra_body={"think": "low"},
+    )
+    sent = json.loads(chat.calls.last.request.content)
+    assert sent["think"] == "low"
+
+
+@respx.mock
 def test_think_kept_when_capabilities_absent_and_memoized():
     # Pre-capability Ollama: /api/show 200 without a capabilities key. A 200 is
     # definitive, so it must be memoized — not re-probed on every request.
