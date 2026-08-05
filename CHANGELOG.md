@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.3] - 2026-08-05
 
 ### Fixed
 
@@ -166,6 +166,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Explicit `activate()` API and a `hermes-ollama-native` CLI
   (`install-pth` / `uninstall-pth` / `status`) for persistent, opt-in startup activation.
 
+[0.3.3]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/hanzlamateen/hermes-ollama-native/compare/v0.2.0...v0.3.0
