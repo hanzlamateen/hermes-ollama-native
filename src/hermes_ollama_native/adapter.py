@@ -29,6 +29,8 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import httpx
 
+from .tool_alias import alias_request, restore_response
+
 logger = logging.getLogger("hermes_ollama_native")
 
 # Feature flag — native mode only engages when explicitly enabled. Off → callers
@@ -803,8 +805,11 @@ class OllamaNativeClient:
             think=think,
         )
 
+        request, tool_names = alias_request(request)
         if stream:
-            return self._stream_completion(model=model, request=request, timeout=timeout)
+            return self._stream_completion(
+                model=model, request=request, timeout=timeout, tool_names=tool_names
+            )
 
         url = f"{self.base_url}/api/chat"
         resp = self._http.post(
@@ -818,10 +823,15 @@ class OllamaNativeClient:
             raise OllamaAPIError(
                 f"Invalid JSON from Ollama /api/chat: {exc}", status_code=resp.status_code
             ) from exc
-        return translate_ollama_response(payload, model=model)
+        return translate_ollama_response(restore_response(payload, tool_names), model=model)
 
     def _stream_completion(
-        self, *, model: str, request: Dict[str, Any], timeout: Any = None
+        self,
+        *,
+        model: str,
+        request: Dict[str, Any],
+        timeout: Any = None,
+        tool_names: Optional[Dict[str, str]] = None,
     ) -> Iterator[_OllamaStreamChunk]:
         url = f"{self.base_url}/api/chat"
 
@@ -851,7 +861,9 @@ class OllamaNativeClient:
                         logger.debug("Non-JSON Ollama stream line: %s", str(raw_line)[:200])
                         continue
                     if isinstance(obj, dict):
-                        for chunk in translate_stream_line(obj, model, tool_idx):
+                        for chunk in translate_stream_line(
+                            restore_response(obj, tool_names or {}), model, tool_idx
+                        ):
                             yield chunk
 
         return _generator()
