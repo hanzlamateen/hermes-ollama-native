@@ -91,6 +91,7 @@ hermes-ollama-native uninstall-pth   # remove the startup hook
 |---|---|---|
 | `HERMES_OLLAMA_NATIVE` | _(unset)_ | Master switch. Unset/false → the patch is a complete no-op and Hermes stays on `/v1`. Set truthy → native `/api/chat` routing for confirmed-Ollama endpoints. |
 | `HERMES_OLLAMA_NATIVE_AUX` | `1` | When native mode is on, also route auxiliary side-tasks (compression/title/vision) through native. Set `0` to keep only the main chat path on native. |
+| `HERMES_OLLAMA_GRANITE_TOOL_ALIAS` | `1` | Work around the Granite 4 / Ollama parser collision with Hermes's deferred `tool_call` bridge. Set `0` only for diagnosis or after the Ollama parser is fixed. |
 
 **Turning it off** needs no "deactivate" step: every hook re-checks `HERMES_OLLAMA_NATIVE` per call, so unsetting it transparently reverts the agent to `/v1` (run `uninstall-pth` too if you installed the startup hook).
 
@@ -99,6 +100,7 @@ hermes-ollama-native uninstall-pth   # remove the startup hook
 - Targets a Hermes Agent that exposes `agent.agent_runtime_helpers.create_openai_client` and `agent.auxiliary_client.resolve_provider_client` / `resolve_vision_provider_client` (the structure as of Hermes `v0.17.x`).
 - Patches **private** internals — see the warning above. Pinned/tested against the Hermes releases noted in the changelog.
 - Only routes endpoints positively identified as Ollama via `GET /api/version`. vLLM / llama.cpp / LM Studio (also `provider: custom`) are left on `/v1`.
+- Granite 4 requests use a request-local wire alias for Hermes's deferred `tool_call` bridge. The adapter restores the original name before Hermes dispatch; other models and user/tool payload data are unchanged. See [the diagnosis, validation, and rollback guide](docs/granite-tool-call-collision.md).
 
 ## Development
 

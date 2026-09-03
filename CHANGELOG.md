@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Granite 4 requests now alias Hermes's deferred `tool_call` bridge on the
+  Ollama wire and restore it before dispatch. This prevents Ollama's generic
+  parser from mistaking Granite's `<tool_call>` XML marker for the bridge name
+  while preserving the full tool set, arguments, history, and user content.
+
 ## [0.3.3] - 2026-08-05
 
 ### Fixed
