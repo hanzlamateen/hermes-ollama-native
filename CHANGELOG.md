@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- When Ollama stops a response with `done_reason="length"` after it has sent a
+  tool call, the adapter now reports `length` instead of `tool_calls`. Hermes
+  then treats the response as cut off and retries it instead of running the
+  call. Ollama's own `/v1` maps it the same way: it only turns `stop` into
+  `tool_calls`. Found by @kvnloo on NousResearch/hermes-agent#73285.
+
 ## [0.3.3] - 2026-08-05
 
 ### Fixed

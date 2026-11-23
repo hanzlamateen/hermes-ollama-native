@@ -166,6 +166,25 @@ def test_length_finish_reason():
     assert resp.choices[0].finish_reason == "length"
 
 
+def test_length_finish_reason_wins_over_tool_calls():
+    """A response Ollama cut off is incomplete even after a tool call, as on /v1."""
+    tc = {"function": {"name": "look_up", "arguments": {"query": "x"}}}
+    tool_idx = {"n": 0}
+    streamed = translate_stream_line({"message": {"tool_calls": [tc]}}, "m", tool_idx)
+    assert streamed[0].choices[0].delta.tool_calls[0].function.name == "look_up"
+
+    terminal = translate_stream_line(
+        {"done": True, "done_reason": "length", "prompt_eval_count": 4096}, "m", tool_idx
+    )
+    assert terminal[-1].choices[0].finish_reason == "length"
+
+    resp = translate_ollama_response(
+        {"message": {"role": "assistant", "tool_calls": [tc]}, "done_reason": "length"},
+        model="m",
+    )
+    assert resp.choices[0].finish_reason == "length"
+
+
 # ── streaming (NDJSON) translation ────────────────────────────────────────────
 
 
