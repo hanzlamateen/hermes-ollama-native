@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-ollama-native"
-version = "0.3.3"
+version = "0.3.4"
 description = "Route a Hermes Agent's local Ollama traffic through the native /api/chat API (honors num_ctx + correct tool-call streaming) instead of the OpenAI-compat /v1 endpoint."
 readme = "README.md"
 requires-python = ">=3.10"
